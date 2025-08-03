@@ -1,3 +1,4 @@
+from unittest import case
 import pika
 import json
 from FraudEngine import FraudEngine
@@ -28,7 +29,31 @@ def callback(ch, method, properties, body):
     result = engine.predict_transaction(features)
     print(f"Transaction {data['transaction_id']} fraud prediction: {result}")
 
-connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    match result: 
+        case 1:
+            print(f"Transaction {data['transaction_id']} is likely fraudulent.")
+            queue_name = 'fraud'
+        case 0:
+            print(f"Transaction {data['transaction_id']} is likely not fraudulent.")
+            queue_name = 'non_fraud'
+        case _:
+            print(f"Transaction {data['transaction_id']} prediction is inconclusive.")
+            queue_name = 'unknown'
+
+   
+    channel.basic_publish(
+        exchange='',
+        routing_key=queue_name,
+        body=json.dumps(data)
+    )
+
+connection = pika.BlockingConnection(
+    pika.ConnectionParameters(
+        host='localhost',
+        port=5672,
+        credentials=pika.PlainCredentials('username', 'password')
+    )
+)
 channel = connection.channel()
 channel.queue_declare(queue='fraud_queue')
 
